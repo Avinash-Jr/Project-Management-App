@@ -12,13 +12,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUserTasks = exports.updateTaskStatus = exports.createTask = exports.getTasks = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
+/* ===================== GET TASKS BY PROJECT ===================== */
 const getTasks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { projectId } = req.query;
     try {
+        const projectId = Number(req.query.projectId);
+        if (!projectId || isNaN(projectId)) {
+            res.status(400).json({
+                message: "Valid projectId query parameter is required",
+            });
+            return;
+        }
         const tasks = yield prisma.task.findMany({
-            where: {
-                projectId: Number(projectId),
-            },
+            where: { projectId },
             include: {
                 author: true,
                 assignee: true,
@@ -29,15 +34,21 @@ const getTasks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         res.json(tasks);
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: `Error retrieving tasks: ${error.message}` });
+        console.error("getTasks error:", error);
+        res.status(500).json({ message: "Failed to retrieve tasks" });
     }
 });
 exports.getTasks = getTasks;
+/* ===================== CREATE TASK ===================== */
 const createTask = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { title, description, status, priority, tags, startDate, dueDate, points, projectId, authorUserId, assignedUserId, } = req.body;
     try {
+        const { title, description, status, priority, tags, startDate, dueDate, points, projectId, authorUserId, assignedUserId, } = req.body;
+        if (!title || !projectId || !authorUserId) {
+            res.status(400).json({
+                message: "title, projectId, and authorUserId are required",
+            });
+            return;
+        }
         const newTask = yield prisma.task.create({
             data: {
                 title,
@@ -48,47 +59,59 @@ const createTask = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 startDate,
                 dueDate,
                 points,
-                projectId,
-                authorUserId,
-                assignedUserId,
+                projectId: Number(projectId),
+                authorUserId: Number(authorUserId),
+                assignedUserId: assignedUserId
+                    ? Number(assignedUserId)
+                    : null,
             },
         });
         res.status(201).json(newTask);
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: `Error creating a task: ${error.message}` });
+        console.error("createTask error:", error);
+        res.status(500).json({ message: "Failed to create task" });
     }
 });
 exports.createTask = createTask;
+/* ===================== UPDATE TASK STATUS ===================== */
 const updateTaskStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { taskId } = req.params;
-    const { status } = req.body;
     try {
+        const taskId = Number(req.params.taskId);
+        const { status } = req.body;
+        if (!taskId || isNaN(taskId) || !status) {
+            res.status(400).json({
+                message: "Valid taskId and status are required",
+            });
+            return;
+        }
         const updatedTask = yield prisma.task.update({
-            where: {
-                id: Number(taskId),
-            },
-            data: {
-                status: status,
-            },
+            where: { id: taskId },
+            data: { status },
         });
         res.json(updatedTask);
     }
     catch (error) {
-        res.status(500).json({ message: `Error updating task: ${error.message}` });
+        console.error("updateTaskStatus error:", error);
+        res.status(500).json({ message: "Failed to update task status" });
     }
 });
 exports.updateTaskStatus = updateTaskStatus;
+/* ===================== GET TASKS BY USER ===================== */
 const getUserTasks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId } = req.params;
     try {
+        const userId = Number(req.params.userId);
+        if (!userId || isNaN(userId)) {
+            res.status(400).json({
+                message: "Valid userId is required",
+            });
+            return;
+        }
         const tasks = yield prisma.task.findMany({
             where: {
                 OR: [
-                    { authorUserId: Number(userId) },
-                    { assignedUserId: Number(userId) },
+                    { authorUserId: userId },
+                    { assignedUserId: userId },
                 ],
             },
             include: {
@@ -99,9 +122,8 @@ const getUserTasks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         res.json(tasks);
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: `Error retrieving user's tasks: ${error.message}` });
+        console.error("getUserTasks error:", error);
+        res.status(500).json({ message: "Failed to retrieve user tasks" });
     }
 });
 exports.getUserTasks = getUserTasks;
